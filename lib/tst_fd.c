@@ -21,8 +21,20 @@
 #include "lapi/io_uring.h"
 #include "lapi/bpf.h"
 #include "lapi/fsmount.h"
+#include "lapi/syscalls.h"
 
 #include "tst_fd.h"
+
+#define tst_fd_syscall(NR, ...) ({ \
+	intptr_t tst_ret; \
+	if ((NR) == __LTP__NR_INVALID_SYSCALL) { \
+		errno = ENOSYS; \
+		tst_ret = -1; \
+	} else { \
+		tst_ret = syscall((NR), ##__VA_ARGS__); \
+	} \
+	tst_ret; \
+})
 
 struct tst_fd_desc {
 	void (*open_fd)(struct tst_fd *fd);
@@ -139,14 +151,14 @@ static void open_timerfd(struct tst_fd *fd)
 
 static void open_pidfd(struct tst_fd *fd)
 {
-	fd->fd = syscall(__NR_pidfd_open, getpid(), 0);
+	fd->fd = tst_fd_syscall(__NR_pidfd_open, getpid(), 0);
 	if (fd->fd < 0)
 		tst_res(TCONF | TERRNO, "pidfd_open()");
 }
 
 static void open_fanotify(struct tst_fd *fd)
 {
-	fd->fd = syscall(__NR_fanotify_init, FAN_CLASS_NOTIF, O_RDONLY);
+	fd->fd = tst_fd_syscall(__NR_fanotify_init, FAN_CLASS_NOTIF, O_RDONLY);
 	if (fd->fd < 0) {
 		tst_res(TCONF | TERRNO,
 			"Skipping %s", tst_fd_desc(fd));
@@ -164,7 +176,7 @@ static void open_inotify(struct tst_fd *fd)
 
 static void open_userfaultfd(struct tst_fd *fd)
 {
-	fd->fd = syscall(__NR_userfaultfd, 0);
+	fd->fd = tst_fd_syscall(__NR_userfaultfd, 0);
 
 	if (fd->fd < 0) {
 		tst_res(TCONF | TERRNO,
@@ -183,7 +195,7 @@ static void open_perf_event(struct tst_fd *fd)
 		.exclude_hv = 1,
 	};
 
-	fd->fd = syscall(__NR_perf_event_open, &pe_attr, 0, -1, -1, 0);
+	fd->fd = tst_fd_syscall(__NR_perf_event_open, &pe_attr, 0, -1, -1, 0);
 	if (fd->fd < 0) {
 		tst_res(TCONF | TERRNO,
 			"Skipping %s", tst_fd_desc(fd));
@@ -194,7 +206,7 @@ static void open_io_uring(struct tst_fd *fd)
 {
 	struct io_uring_params uring_params = {};
 
-	fd->fd = syscall(__NR_io_uring_setup, 1, &uring_params);
+	fd->fd = tst_fd_syscall(__NR_io_uring_setup, 1, &uring_params);
 	if (fd->fd < 0) {
 		tst_res(TCONF | TERRNO,
 			"Skipping %s", tst_fd_desc(fd));
@@ -210,7 +222,7 @@ static void open_bpf_map(struct tst_fd *fd)
 		.max_entries = 1,
 	};
 
-	fd->fd = syscall(__NR_bpf, BPF_MAP_CREATE, &array_attr, sizeof(array_attr));
+	fd->fd = tst_fd_syscall(__NR_bpf, BPF_MAP_CREATE, &array_attr, sizeof(array_attr));
 	if (fd->fd < 0) {
 		tst_res(TCONF | TERRNO,
 			"Skipping %s", tst_fd_desc(fd));
@@ -219,7 +231,7 @@ static void open_bpf_map(struct tst_fd *fd)
 
 static void open_fsopen(struct tst_fd *fd)
 {
-	fd->fd = syscall(__NR_fsopen, "ext2", 0);
+	fd->fd = tst_fd_syscall(__NR_fsopen, "ext2", 0);
 	if (fd->fd < 0) {
 		tst_res(TCONF | TERRNO,
 			"Skipping %s", tst_fd_desc(fd));
@@ -228,7 +240,7 @@ static void open_fsopen(struct tst_fd *fd)
 
 static void open_fspick(struct tst_fd *fd)
 {
-	fd->fd = syscall(__NR_fspick, AT_FDCWD, "/", 0);
+	fd->fd = tst_fd_syscall(__NR_fspick, AT_FDCWD, "/", 0);
 	if (fd->fd < 0) {
 		tst_res(TCONF | TERRNO,
 			"Skipping %s", tst_fd_desc(fd));
@@ -237,7 +249,7 @@ static void open_fspick(struct tst_fd *fd)
 
 static void open_open_tree(struct tst_fd *fd)
 {
-	fd->fd = syscall(__NR_open_tree, AT_FDCWD, "/", 0);
+	fd->fd = tst_fd_syscall(__NR_open_tree, AT_FDCWD, "/", 0);
 	if (fd->fd < 0) {
 		tst_res(TCONF | TERRNO,
 			"Skipping %s", tst_fd_desc(fd));
@@ -246,7 +258,7 @@ static void open_open_tree(struct tst_fd *fd)
 
 static void open_memfd(struct tst_fd *fd)
 {
-	fd->fd = syscall(__NR_memfd_create, "ltp_memfd", 0);
+	fd->fd = tst_fd_syscall(__NR_memfd_create, "ltp_memfd", 0);
 	if (fd->fd < 0) {
 		tst_res(TCONF | TERRNO,
 			"Skipping %s", tst_fd_desc(fd));
@@ -255,7 +267,7 @@ static void open_memfd(struct tst_fd *fd)
 
 static void open_memfd_secret(struct tst_fd *fd)
 {
-	fd->fd = syscall(__NR_memfd_secret, 0);
+	fd->fd = tst_fd_syscall(__NR_memfd_secret, 0);
 	if (fd->fd < 0) {
 		tst_res(TCONF | TERRNO,
 			"Skipping %s", tst_fd_desc(fd));
