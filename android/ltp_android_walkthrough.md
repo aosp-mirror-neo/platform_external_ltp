@@ -16,29 +16,30 @@ sudo apt-get install repo
 ```
 (https://source.android.com/docs/setup/download?hl=en)
 
-Checkout AOSP
--------------
-**WARNING**: this step downloads ~300GB of files from the AOSP repository.
+Checkout Android Platform Source
+--------------------------------
+**WARNING**: this step downloads ~300GB of files.
 
+For a public AOSP checkout (see https://source.android.com/docs/setup/download):
 ```
-mkdir aosp-master
-cd aosp-master
-repo init -u https://android.googlesource.com/platform/manifest -b master --partial-clone --clone-filter=blob:limit=10M
+mkdir android-main
+cd android-main
+repo init --partial-clone --no-use-superproject -b android-latest-release -u https://android.googlesource.com/platform/manifest
 repo sync -c -j8
 ```
-(https://source.android.com/docs/setup/download/downloading?hl=en)
+*(Note: In an internal Android platform checkout on `main`, use the `trunk_staging` lunch release config shown below; on a public `android-latest-release` checkout, replace `trunk_staging` with `aosp_current`, e.g., `lunch aosp_cf_x86_64_only_phone-aosp_current-userdebug`.)*
 
 Set up environment
 ------------------
-This configures the tooling to target cuttlefish arm64:
+This configures the tooling to target Cuttlefish arm64 or x86_64:
 ```
 source build/envsetup.sh
-lunch aosp_cf_arm64_phone-userdebug
+lunch aosp_cf_arm64_phone-trunk_staging-userdebug
 ```
-Alternatively, this will target 32-bit arm:
+Alternatively, to target x86_64 Cuttlefish:
 ```
 source build/envsetup.sh
-lunch aosp_cf_arm_only_phone-userdebug
+lunch aosp_cf_x86_64_phone-trunk_staging-userdebug
 ```
 If you are targeting something else, you can follow the link below for further instructions on how to adjust the target accordingly:
 
@@ -62,29 +63,29 @@ adb devices
 Two ways to run LTP:
 --------------------
 ### Use atest tool to build and run tests
-https://android.googlesource.com/platform/external/ltp/+/master/android/README.md#running-ltp-through-atest
+See [README.md](README.md#running-ltp-through-atest):
 ```
 atest -a vts_ltp_test_arm     # 32-bit arm tests
 atest -a vts_ltp_test_arm_64  # 64-bit arm tests
+atest vts_ltp_test_x86_64:syscalls.chdir01_64bit  # single 64-bit x86_64 test
 ```
 
 ### Manually build and run tests
-This is faster to build but requires more manual steps.
+This is faster to build when iterating on a single test binary.
 
-Setup temporary directories:
+Setup temporary directories on the device:
 ```
 adb root
-adb shell "mkdir -p /data/local/tmp/ltp/tmp/ltptemp; mkdir -p /data/local/tmp/ltp/tmp/tmpbase; mkdir -p /data/local/tmp/ltp/tmp/tmpdir; restorecon -F -R /data/local/tmp/ltp"
+adb shell "mkdir -p /data/local/tmp/ltp/tmp/ltptemp /data/local/tmp/ltp/tmp/tmpbase /data/local/tmp/ltp/tmp/tmpdir; chmod -R 777 /data/local/tmp/ltp/tmp; restorecon -F -R /data/local/tmp/ltp"
 ```
 
-This example builds ltp and runs the `pcrypt_aead01` binary:
+This example builds the `pcrypt_aead01` module (or all of `external/ltp` via `mma`), syncs it, and runs the binary:
 ```
-cd external/ltp
-mma
+m ltp_pcrypt_aead01
 adb sync data
-adb shell "TMP=/data/local/tmp/ltp/tmp LTPTMP=/data/local/tmp/ltp/tmp/ltptemp LTP_DEV_FS_TYPE=ext4 TMPBASE=/data/local/tmp/ltp/tmp/tmpbase TMPDIR=/data/local/tmp/ltp/tmp/tmpdir LTPROOT=/data/local/tmp/ltp PATH=/data/nativetest64/ltp/testcases/bin:$PATH pcrypt_aead01"
+adb shell "LTPROOT=/data/local/tmp/ltp LTP_DEV_FS_TYPE=ext4 TMP=/data/local/tmp/ltp/tmp LTPTMP=/data/local/tmp/ltp/tmp/ltptemp TMPBASE=/data/local/tmp/ltp/tmp/tmpbase TMPDIR=/data/local/tmp/ltp/tmp/tmpdir LTP_TIMEOUT_MUL=2 PATH=/system/bin:/data/local/tmp/ltp:/data/nativetest64/vts_ltp_tests/testcases/bin pcrypt_aead01"
 ```
-(https://android.googlesource.com/platform/external/ltp/+/master/android/README.md#running-ltp-directly)
+See [README.md](README.md#running-ltp-directly) for more details.
 
 Modify an existing test and rerun it
 ------------------------------------
@@ -94,7 +95,7 @@ If you are applying a patch file, you may do the following, filling in the patch
 ```
 cd external/ltp
 git apply <patch filename>.patch
-mma
+m ltp_<test binary>
 adb sync data
-adb shell "TMP=/data/local/tmp/ltp/tmp LTPTMP=/data/local/tmp/ltp/tmp/ltptemp LTP_DEV_FS_TYPE=ext4 TMPBASE=/data/local/tmp/ltp/tmp/tmpbase TMPDIR=/data/local/tmp/ltp/tmp/tmpdir LTPROOT=/data/local/tmp/ltp PATH=/data/nativetest64/ltp/testcases/bin:$PATH <test binary>"
+adb shell "LTPROOT=/data/local/tmp/ltp LTP_DEV_FS_TYPE=ext4 TMP=/data/local/tmp/ltp/tmp LTPTMP=/data/local/tmp/ltp/tmp/ltptemp TMPBASE=/data/local/tmp/ltp/tmp/tmpbase TMPDIR=/data/local/tmp/ltp/tmp/tmpdir LTP_TIMEOUT_MUL=2 PATH=/system/bin:/data/local/tmp/ltp:/data/nativetest64/vts_ltp_tests/testcases/bin <test binary>"
 ```
