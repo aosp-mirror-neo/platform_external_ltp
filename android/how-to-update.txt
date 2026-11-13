@@ -1,10 +1,29 @@
 INSTRUCTIONS
 
-You'll need docker installed, so that a clean environment can be created.
+For a full LTP upgrade from upstream, prefer the automated workflow from the
+Android checkout root ($ANDROID_BUILD_TOP):
 
-(1) checkout updated LTP tree under external/ltp
-(2) ensure your LTP tree is clean by running
+    tools/external_updater/updater.sh update \
+        --no-upload \
+        --keep-local-changes \
+        external/ltp
+
+Passing --no-upload prevents updater.sh from automatically pushing the commit
+to Gerrit before local build verification, and --keep-local-changes updates the
+current branch in place. The post_update.sh hook automatically runs
+gen_android_build.sh --update to regenerate the Soong build files.
+
+To regenerate the Android Soong build files manually (for example, after
+editing android/tools/disabled_tests.txt or android/tools/disabled_libs.txt):
+
+You will need Docker (or rootless Docker, see go/docker) installed so that a
+clean build environment can be created.
+
+(1) Ensure your LTP tree is clean:
         git clean -x -f -d
-(2) run the gen_android_build.sh script
-        android/tools/gen_android_build.sh
-(3) commit changes to gen.bp, testcases/Android.bp, android/Android.bp
+(2) Run the blueprint generator script. Always pass --update; without it,
+    cached make dry-run dumps in android/tools/dump/ are reused and the
+    generated .bp files may be stale:
+        ./android/tools/gen_android_build.sh --update
+(3) Verify the build and commit changes to gen.bp, testcases/Android.bp, and
+    android/Android.bp.
